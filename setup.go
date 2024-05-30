@@ -1,7 +1,6 @@
 package hexcamp
 
 import (
-	"fmt"
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
@@ -13,7 +12,6 @@ func init() { plugin.Register("hexcamp", setup) }
 // setup is the function that gets called when the config parser see the token "example". Setup is responsible
 // for parsing any extra options the example plugin may have. The first token this function sees is "example".
 func setup(c *caddy.Controller) error {
-	fmt.Println("Jim hexcamp setup")
 	c.Next() // Ignore "example" and give us the next token.
 	if c.NextArg() {
 		// If there was another token, return an error, because we don't have any configuration.

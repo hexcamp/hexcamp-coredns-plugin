@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/coredns/coredns/plugin"
-	"github.com/coredns/coredns/plugin/metrics"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/coredns/coredns/request"
 	"github.com/uber/h3-go/v4"
@@ -52,7 +51,7 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 			str = str + padding
 			data, err := base32.StdEncoding.DecodeString(str)
 			if err != nil {
-				fmt.Printf("Base32 decoding failed, %v\n", err)
+				fmt.Printf("Base32 decoding failed, %v: %v\n", matches[1], err)
 			} else {
 				hex := strings.ReplaceAll(fmt.Sprintf("8%-14s", hex.EncodeToString(data)), " ", "f")
 
@@ -68,16 +67,18 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 				target = fmt.Sprintf("%s%d.h3.test.hex.camp.", target, base)
 				rr := new(dns.CNAME)
 				rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeCNAME, Class: state.QClass()}
-				// rr.Target = "3.4.5.4.2.4.2.1.2.4.46.h3.test.hex.camp."
 				rr.Target = target
 
 				a := new(dns.Msg)
 				a.SetReply(r)
 				a.Authoritative = true
-				a.Extra = []dns.RR{rr}
+				a.Answer = []dns.RR{rr}
 				fmt.Printf("hexcamp: %v => %v\n", matches[1], target)
 
-				w.WriteMsg(a)
+				err := w.WriteMsg(a)
+				if err != nil {
+					fmt.Printf("hexcamp WriteMsg error: %v\n", err)
+				}
 
 				return 0, nil
 			}
@@ -87,7 +88,7 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 	// pw := NewResponsePrinter(w)
 
 	// Export metric with the server label set to the current server handling the request.
-	requestCount.WithLabelValues(metrics.WithServer(ctx)).Inc()
+	// requestCount.WithLabelValues(metrics.WithServer(ctx)).Inc()
 
 	// Call next plugin (if any).
 	return plugin.NextOrFailure(h.Name(), h.Next, ctx, w, r)
@@ -95,19 +96,3 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 
 // Name implements the Handler interface.
 func (h HexCamp) Name() string { return "hexcamp" }
-
-// ResponsePrinter wrap a dns.ResponseWriter and will write example to standard output when WriteMsg is called.
-type ResponsePrinter struct {
-	dns.ResponseWriter
-}
-
-// NewResponsePrinter returns ResponseWriter.
-func NewResponsePrinter(w dns.ResponseWriter) *ResponsePrinter {
-	return &ResponsePrinter{ResponseWriter: w}
-}
-
-// WriteMsg calls the underlying ResponseWriter's WriteMsg method and prints "example" to standard output.
-func (r *ResponsePrinter) WriteMsg(res *dns.Msg) error {
-	log.Info("hexcamp-plugin")
-	return r.ResponseWriter.WriteMsg(res)
-}
