@@ -32,31 +32,54 @@ func init() {
 }
 
 func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-	fmt.Printf("Jim hexcamp ServeDNS\n")
 	state := request.Request{W: w, Req: r}
 
-	if state.QType() == dns.TypeA || state.QType() == dns.TypeAAAA {
-		fmt.Printf("Jim hexcamp A AAAA: %v\n", state.Name())
+	if state.QType() == dns.TypeA || state.QType() == dns.TypeAAAA || state.QType() == dns.TypeCNAME {
 		matches := regex.FindStringSubmatch(state.Name())
 		if len(matches) == 2 {
-			fmt.Printf("Jim match: %v\n", matches[1])
 			str := strings.ToUpper(matches[1])
+			padding := ""
+			switch len(str) % 8 {
+			case 2:
+				padding = "======"
+			case 4:
+				padding = "===="
+			case 5:
+				padding = "==="
+			case 7:
+				padding = "=="
+			}
+			str = str + padding
 			data, err := base32.StdEncoding.DecodeString(str)
-			if err == nil {
+			if err != nil {
+				fmt.Printf("Base32 decoding failed, %v\n", err)
+			} else {
 				hex := strings.ReplaceAll(fmt.Sprintf("8%-14s", hex.EncodeToString(data)), " ", "f")
-				fmt.Printf("hex: %v\n", hex)
 
 				cell2 := h3.Cell(h3.IndexFromString(hex))
-				fmt.Printf("cell2 %s\n", cell2)
 				resolution := cell2.Resolution()
-				fmt.Printf("cell2 resolution %v\n", resolution)
 				base := cell2.BaseCellNumber()
+				target := ""
 				for i := resolution; i > 0; i-- {
 					parent := cell2.Parent(i)
 					childPos := parent.ChildPos(i - 1)
-					fmt.Printf("  %d: Parent %s %d: %d\n", i, parent.String(), parent.Resolution(), childPos)
+					target = fmt.Sprintf("%s%d.", target, childPos)
 				}
-				fmt.Printf("cell2 base %v\n", base)
+				target = fmt.Sprintf("%s%d.h3.test.hex.camp.", target, base)
+				rr := new(dns.CNAME)
+				rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeCNAME, Class: state.QClass()}
+				// rr.Target = "3.4.5.4.2.4.2.1.2.4.46.h3.test.hex.camp."
+				rr.Target = target
+
+				a := new(dns.Msg)
+				a.SetReply(r)
+				a.Authoritative = true
+				a.Extra = []dns.RR{rr}
+				fmt.Printf("hexcamp: %v => %v\n", matches[1], target)
+
+				w.WriteMsg(a)
+
+				return 0, nil
 			}
 		}
 	}
