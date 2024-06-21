@@ -36,12 +36,16 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 	// fmt.Printf("Jim domainNameRegex: %v\n", domainNameRegex)
 	regex, _ = regexp.Compile(`^(.*\.)?([^.]+)\.` + domainNameRegex + `\.$`)
 
-	if state.QType() == dns.TypeA || state.QType() == dns.TypeAAAA || state.QType() == dns.TypeCNAME {
+	if state.QType() == dns.TypeA || state.QType() == dns.TypeAAAA ||
+		state.QType() == dns.TypeCNAME || state.QType() == dns.TypeTXT {
 		matches := regex.FindStringSubmatch(state.Name())
 		if len(matches) == 3 {
 			// fmt.Printf("Jim matches: %+v\n", matches)
 			prefix := matches[1]
 			str := strings.ToUpper(matches[2])
+			if len(str) < 3 {
+				return plugin.NextOrFailure(h.Name(), h.Next, ctx, w, r)
+			}
 			padding := ""
 			switch len(str) % 8 {
 			case 2:
