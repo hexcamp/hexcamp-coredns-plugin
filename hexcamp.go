@@ -27,16 +27,21 @@ type HexCamp struct {
 var regex *regexp.Regexp
 
 func init() {
-	regex, _ = regexp.Compile(`^([^.]+)\.test\.hex\.camp\.$`)
 }
 
 func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 
+	domainNameRegex := strings.ReplaceAll(domainName, ".", `\.`)
+	// fmt.Printf("Jim domainNameRegex: %v\n", domainNameRegex)
+	regex, _ = regexp.Compile(`^(.*\.)?([^.]+)\.` + domainNameRegex + `\.$`)
+
 	if state.QType() == dns.TypeA || state.QType() == dns.TypeAAAA || state.QType() == dns.TypeCNAME {
 		matches := regex.FindStringSubmatch(state.Name())
-		if len(matches) == 2 {
-			str := strings.ToUpper(matches[1])
+		if len(matches) == 3 {
+			// fmt.Printf("Jim matches: %+v\n", matches)
+			prefix := matches[1]
+			str := strings.ToUpper(matches[2])
 			padding := ""
 			switch len(str) % 8 {
 			case 2:
@@ -64,7 +69,7 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 					childPos := parent.ChildPos(i - 1)
 					target = fmt.Sprintf("%s%d.", target, childPos)
 				}
-				target = fmt.Sprintf("%s%d.h3.test.hex.camp.", target, base)
+				target = fmt.Sprintf("%s%s%d.h3.%s.", prefix, target, base, domainName)
 				rr := new(dns.CNAME)
 				rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeCNAME, Class: state.QClass()}
 				rr.Target = target
@@ -73,7 +78,7 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 				a.SetReply(r)
 				a.Authoritative = true
 				a.Answer = []dns.RR{rr}
-				fmt.Printf("hexcamp: %v => %v\n", matches[1], target)
+				log.Infof("hexcamp: %v%v => %v\n", matches[1], matches[2], target)
 
 				err := w.WriteMsg(a)
 				if err != nil {
