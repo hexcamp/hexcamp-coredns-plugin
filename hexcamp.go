@@ -43,7 +43,7 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 			// fmt.Printf("Jim matches: %+v\n", matches)
 			prefix := matches[1]
 			str := strings.ToUpper(matches[2])
-			if len(str) < 3 {
+			if str == "H3" {
 				return plugin.NextOrFailure(h.Name(), h.Next, ctx, w, r)
 			}
 			padding := ""
