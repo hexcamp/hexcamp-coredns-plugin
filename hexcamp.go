@@ -36,6 +36,7 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 	// fmt.Printf("Jim domainNameRegex: %v\n", domainNameRegex)
 	regex, _ = regexp.Compile(`^(.*\.)?([^.]+)\.` + domainNameRegex + `\.$`)
 
+	fmt.Printf("Jim hexcamp request state: %+v\n", state)
 	if state.QType() == dns.TypeA || state.QType() == dns.TypeAAAA ||
 		state.QType() == dns.TypeCNAME || state.QType() == dns.TypeTXT {
 		matches := regex.FindStringSubmatch(state.Name())
