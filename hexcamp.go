@@ -21,7 +21,8 @@ import (
 var log = clog.NewWithPlugin("hexcamp")
 
 type HexCamp struct {
-	Next plugin.Handler
+	DomainName string
+	Next       plugin.Handler
 }
 
 var regex *regexp.Regexp
@@ -32,11 +33,11 @@ func init() {
 func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 
-	domainNameRegex := strings.ReplaceAll(domainName, ".", `\.`)
-	// fmt.Printf("Jim domainNameRegex: %v\n", domainNameRegex)
+	domainNameRegex := strings.ReplaceAll(h.DomainName, ".", `\.`)
+	// log.Debugf("DomainNameRegex: %v\n", domainNameRegex)
 	regex, _ = regexp.Compile(`^(.*\.)?([^.]+)\.` + domainNameRegex + `\.$`)
 
-	fmt.Printf("Jim hexcamp request state: %+v\n", state)
+	// fmt.Printf("Jim hexcamp request state: %+v\n", state)
 	if state.QType() == dns.TypeA || state.QType() == dns.TypeAAAA ||
 		state.QType() == dns.TypeCNAME || state.QType() == dns.TypeTXT {
 		matches := regex.FindStringSubmatch(state.Name())
@@ -61,7 +62,7 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 			str = str + padding
 			data, err := base32.StdEncoding.DecodeString(str)
 			if err != nil {
-				fmt.Printf("Base32 decoding failed, %v: %v\n", matches[1], err)
+				// fmt.Printf("Base32 decoding failed, %v: %v\n", matches[1], err)
 			} else {
 				hex := strings.ReplaceAll(fmt.Sprintf("8%-14s", hex.EncodeToString(data)), " ", "f")
 
@@ -74,7 +75,7 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 					childPos := parent.ChildPos(i - 1)
 					target = fmt.Sprintf("%s%d.", target, childPos)
 				}
-				target = fmt.Sprintf("%s%s%d.h3.%s.", prefix, target, base, domainName)
+				target = fmt.Sprintf("%s%s%d.h3.%s.", prefix, target, base, h.DomainName)
 				rr := new(dns.CNAME)
 				rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeCNAME, Class: state.QClass()}
 				rr.Target = target
@@ -87,7 +88,7 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 
 				err := w.WriteMsg(a)
 				if err != nil {
-					fmt.Printf("hexcamp WriteMsg error: %v\n", err)
+					// fmt.Printf("hexcamp WriteMsg error: %v\n", err)
 				}
 
 				return 0, nil

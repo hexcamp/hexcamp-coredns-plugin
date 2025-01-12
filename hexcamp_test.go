@@ -14,8 +14,10 @@ import (
 
 func TestExample(t *testing.T) {
 	// Create a new Example Plugin. Use the test.ErrorHandler as the next plugin.
-	x := HexCamp{Next: test.ErrorHandler()}
-	domainName = "test.hex.camp"
+	x := HexCamp{
+		DomainName: "test.hex.camp",
+		Next:       test.ErrorHandler(),
+	}
 
 	// Setup a new output buffer that is *not* standard output, so we can check if
 	// example is really being printed.
