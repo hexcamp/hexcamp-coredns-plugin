@@ -10,6 +10,7 @@ import (
 
 	"github.com/coredns/coredns/plugin"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
+	"github.com/coredns/coredns/plugin/pkg/upstream"
 	"github.com/coredns/coredns/request"
 	"github.com/uber/h3-go/v4"
 
@@ -24,6 +25,22 @@ type HexCamp struct {
 	DomainName string
 	Next       plugin.Handler
 }
+
+// Result is the result of a Lookup
+type Result int
+
+const (
+	// Success is a successful lookup.
+	Success Result = iota
+	// NameError indicates a nameerror
+	NameError
+	// Delegation indicates the lookup resulted in a delegation.
+	Delegation
+	// NoData indicates the lookup resulted in a NODATA.
+	NoData
+	// ServerFailure indicates a server failure during the lookup.
+	ServerFailure
+)
 
 var regex *regexp.Regexp
 
@@ -79,11 +96,20 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 				rr := new(dns.CNAME)
 				rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeCNAME, Class: state.QClass()}
 				rr.Target = target
+				rrs := []dns.RR{rr}
+				// From coredns/plugin/file/lookup.go
+				if state.QType() != dns.TypeCNAME {
+					// answer, ns, extra, result := z.Lookup(ctx, state, qname)
+					targetName := rrs[0].(*dns.CNAME).Target
+					lookupRRs, result := h.doLookup(ctx, state, targetName, state.QType())
+					log.Infof("hexcamp: CNAME lookup %v, %v\n", lookupRRs, result)
+					rrs = append(rrs, lookupRRs...)
+				}
 
 				a := new(dns.Msg)
 				a.SetReply(r)
 				a.Authoritative = true
-				a.Answer = []dns.RR{rr}
+				a.Answer = rrs
 				log.Infof("hexcamp: %v%v => %v\n", matches[1], matches[2], target)
 
 				err := w.WriteMsg(a)
@@ -107,3 +133,23 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 
 // Name implements the Handler interface.
 func (h HexCamp) Name() string { return "hexcamp" }
+
+func (h *HexCamp) doLookup(ctx context.Context, state request.Request, target string, qtype uint16) ([]dns.RR, Result) {
+	m, e := upstream.New().Lookup(ctx, state, target, qtype)
+	if e != nil {
+		return nil, ServerFailure
+	}
+	if m == nil {
+		return nil, Success
+	}
+	if m.Rcode == dns.RcodeNameError {
+		return m.Answer, NameError
+	}
+	if m.Rcode == dns.RcodeServerFailure {
+		return m.Answer, ServerFailure
+	}
+	if m.Rcode == dns.RcodeSuccess && len(m.Answer) == 0 {
+		return m.Answer, NoData
+	}
+	return m.Answer, Success
+}
