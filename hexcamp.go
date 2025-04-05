@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/metadata"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/coredns/coredns/plugin/pkg/upstream"
 	"github.com/coredns/coredns/request"
@@ -101,6 +102,10 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 				if state.QType() != dns.TypeCNAME {
 					// answer, ns, extra, result := z.Lookup(ctx, state, qname)
 					targetName := rrs[0].(*dns.CNAME).Target
+					// set metadata
+					metadata.SetValueFunc(ctx, "hexcamp/lookup", func() string {
+						return "true"
+					})
 					lookupRRs, result := h.doLookup(ctx, state, targetName, state.QType())
 					log.Infof("hexcamp: CNAME lookup %v, %v\n", lookupRRs, result)
 					rrs = append(rrs, lookupRRs...)
