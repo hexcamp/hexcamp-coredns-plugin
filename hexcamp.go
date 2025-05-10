@@ -95,7 +95,7 @@ func (h HexCamp) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg)
 				}
 				target = fmt.Sprintf("%s%s%d.h3.%s.", prefix, target, base, h.DomainName)
 				rr := new(dns.CNAME)
-				rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeCNAME, Class: state.QClass()}
+				rr.Hdr = dns.RR_Header{Name: state.QName(), Rrtype: dns.TypeCNAME, Class: state.QClass(), Ttl: 2147483647} // 68 years
 				rr.Target = target
 				rrs := []dns.RR{rr}
 				// From coredns/plugin/file/lookup.go
